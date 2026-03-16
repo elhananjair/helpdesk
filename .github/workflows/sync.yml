@@ -1,0 +1,38 @@
+name: Scheduled Merge from Upstream
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs every night at midnight
+  workflow_dispatch: # Allows you to run it manually with a button click
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Your Fork
+        uses: actions/checkout@v3
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Git
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+
+      - name: Merge Upstream and Protect Frontend
+        run: |
+          git remote add upstream https://github.com/frappe/helpdesk.git
+          git fetch upstream main
+          
+          # 1. Do the merge, favoring your code IF there's a direct conflict
+          git merge upstream/main -X ours --allow-unrelated-histories --no-edit || true
+          
+          # 2. THE BULLETPROOF STEP: Forcefully restore YOUR exact files from before the merge.
+          # You can add as many file paths here as you want, separated by a space.
+          git checkout origin/main -- desk/src/components/layouts/Sidebar.vue desk/src/pages/dashboard/Dashboard.vue
+          
+          # 3. Commit the restored files if upstream tried to change them
+          git commit -m "Auto-restored custom frontend files" || echo "No restoration needed"
+          
+          # 4. Push the final synced and protected code to your fork
+          git push origin main
