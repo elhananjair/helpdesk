@@ -57,6 +57,7 @@
           doctype="HD Team"
           :placeholder="__('Team')"
           v-model="filters.team"
+          :filters="teamFilter" 
           :page-length="5"
           :hide-me="true"
         >
@@ -200,6 +201,13 @@ const trendData = createResource({
 });
 
 const agentFilter = ref(null);
+const teamFilter = computed(() => {
+// If they are not an admin, lock the search results to JUST their team
+if (!isSuperUser.value && (authStore.agent?.team || authStore.user?.team)) {
+  return { name: authStore.agent?.team || authStore.user?.team };
+}
+return null; 
+});
 const teamMembers = createResource({
   url: "helpdesk.helpdesk.doctype.hd_team.hd_team.get_team_members",
   cache: ["Analytics", "TeamMembers"],
