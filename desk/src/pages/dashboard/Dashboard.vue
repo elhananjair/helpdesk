@@ -152,7 +152,12 @@ import {
 import { computed, h, onMounted, reactive, ref, watch } from "vue";
 import { __ } from "@/translation";
 
-const { isManager, userId } = useAuthStore();
+// const { isManager, userId } = useAuthStore();
+const authStore = useAuthStore();
+const isManager = authStore.isManager;
+const userId = authStore.userId;
+// We also need this for the filter logic!
+const isSuperUser = authStore.isSuperUser;
 
 const filters = reactive({
   period: getLastXDays(),
@@ -202,11 +207,13 @@ const trendData = createResource({
 
 const agentFilter = ref(null);
 const teamFilter = computed(() => {
-// If they are not an admin, lock the search results to JUST their team
-if (!isSuperUser.value && (authStore.agent?.team || authStore.user?.team)) {
-  return { name: authStore.agent?.team || authStore.user?.team };
-}
-return null; 
+
+  if (isSuperUser) return null; 
+  const myTeam = authStore.agent?.team || authStore.user?.team;
+  if (myTeam) {
+    return { name: myTeam };
+  }
+  return null; 
 });
 const teamMembers = createResource({
   url: "helpdesk.helpdesk.doctype.hd_team.hd_team.get_team_members",
@@ -392,6 +399,12 @@ onMounted(() => {
     // when filters are updated, resources are reloaded coz of the watcher
     filters.agent = userId;
     return;
+  }
+  if (!isSuperUser) {
+    const myTeam = authStore.agent?.team || authStore.user?.team;
+    if (myTeam) {
+      filters.team = myTeam;
+    }
   }
   // If not managers call the resources
   numberCards.reload();
