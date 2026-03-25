@@ -43,6 +43,7 @@ def get_user():
     return {
         "has_desk_access": has_desk_access,
         "is_admin": is_admin,
+        "is_top_executive": is_top_executive,
         "is_agent": is_agent,
         "user_id": user_id,
         "is_manager": is_manager,
