@@ -109,6 +109,7 @@
           v-if="isFCSite && !isCustomerPortal"
           :isSidebarCollapsed="!isExpanded"
         />
+        <!--
         <GettingStartedBanner
           v-if="showOnboardingBanner"
           :isSidebarCollapsed="!isExpanded"
@@ -128,7 +129,7 @@
           }
         "
       />
-
+      -->
       <SidebarLink
         :icon="isExpanded ? LucideArrowLeftFromLine : LucideArrowRightFromLine"
         :is-active="false"
@@ -143,6 +144,7 @@
     />
     <SettingsModal v-model="showSettingsModal" />
     <ShortcutsModal v-model="showShortcutsModal" />
+    <!--  
     <HelpModal
       v-if="showHelpModal"
       v-model="showHelpModal"
@@ -156,6 +158,7 @@
       :afterReset="(step: string) => capture('onboarding_step_reset_' + step)"
       :afterResetAll="() => capture('onboarding_steps_reset')"
     />
+    -->
     <IntermediateStepModal
       v-model="showIntermediateModal"
       :currentStep="currentStep"
@@ -357,11 +360,16 @@ const agentPortalDropdown = computed(() => [
     icon: h(LucideKeyboard),
     onClick: () => (showShortcutsModal.value = true),
   },
-  {
+  //{
+  //  label: __("Settings"),
+  //  icon: "settings",
+  //  onClick: () => (showSettingsModal.value = true),
+  //},
+  ...(authStore.user?.roles?.includes('System Manager') || authStore.userId === 'Administrator' ? [{
     label: __("Settings"),
     icon: "settings",
     onClick: () => (showSettingsModal.value = true),
-  },
+  }] : []),
   {
     group: __("Danger"),
     hideLabel: true,
