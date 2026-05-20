@@ -104,6 +104,7 @@
     </div>
     <div class="grow" />
     <div class="flex flex-col gap-2 pb-2.5">
+       <!--
       <div class="px-2">
         <TrialBanner
           v-if="isFCSite && !isCustomerPortal"
