@@ -128,8 +128,9 @@
             minimize = !showHelpModal;
           }
         "
+       -->
       />
-      -->
+      
       <SidebarLink
         :icon="isExpanded ? LucideArrowLeftFromLine : LucideArrowRightFromLine"
         :is-active="false"
