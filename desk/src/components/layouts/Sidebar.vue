@@ -110,7 +110,7 @@
           v-if="isFCSite && !isCustomerPortal"
           :isSidebarCollapsed="!isExpanded"
         />
-        <!--
+        
         <GettingStartedBanner
           v-if="showOnboardingBanner"
           :isSidebarCollapsed="!isExpanded"
