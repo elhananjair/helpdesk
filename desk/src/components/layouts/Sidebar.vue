@@ -130,7 +130,6 @@
           }
         "
        -->
-      />
       
       <SidebarLink
         :icon="isExpanded ? LucideArrowLeftFromLine : LucideArrowRightFromLine"
