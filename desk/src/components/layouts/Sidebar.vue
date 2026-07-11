@@ -143,6 +143,7 @@
     />
     <SettingsModal v-model="showSettingsModal" />
     <ShortcutsModal v-model="showShortcutsModal" />
+    <!--
     <HelpModal
       v-if="showHelpModal"
       v-model="showHelpModal"
@@ -156,6 +157,7 @@
       :afterReset="(step: string) => capture('onboarding_step_reset_' + step)"
       :afterResetAll="() => capture('onboarding_steps_reset')"
     />
+    -->
     <IntermediateStepModal
       v-model="showIntermediateModal"
       :currentStep="currentStep"
