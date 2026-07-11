@@ -209,6 +209,12 @@ import LucideUser from "~icons/lucide/user";
 import { useScreenSize } from "@/composables/screen";
 import { useStorage } from "@vueuse/core";
 
+const authStore = useAuthStore();
+const isManager = computed(() => authStore.isManager);
+const userId = computed(() => authStore.userId);
+
+const isSuperUser = computed(() => authStore.isAdmin || authStore.is_top_executive || authStore.is_branch_operation);  
+  
 interface NumberCardData {
   title: string;
   value: number;
@@ -361,18 +367,88 @@ const trendData = createResource({
     filters: parseFilters(filters),
   }),
 });
+// TEAM FILTER
+const teamFilter = computed(() => {
+  if (isSuperUser.value) return null; 
 
-const agentFilter = ref(null);
+  const myTeams = authStore.userTeams;
+  if (myTeams && myTeams.length > 0) {
+    return { name: ["in", myTeams] };
+  }
+  return { name: "___NO_TEAM_ACCESS___" }; 
+});
+
+// AGENT FILTER
+const agentFilter = ref({ name: "___LOADING_AGENTS___" });
+  
+//const agentFilter = ref(null);
+// const teamMembers = createResource({
+//   url: "helpdesk.helpdesk.doctype.hd_team.hd_team.get_team_members",
+//   cache: ["Analytics", "TeamMembers"],
+//   params: {
+//     team: filters.team,
+//   },
+//   onSuccess: (data) => {
+//     agentFilter.value = { name: ["in", data] };
+//   },
+// });
 const teamMembers = createResource({
   url: "helpdesk.helpdesk.doctype.hd_team.hd_team.get_team_members",
   cache: ["Analytics", "TeamMembers"],
-  params: {
-    team: filters.team,
-  },
   onSuccess: (data) => {
-    agentFilter.value = { name: ["in", data] };
+    if (data && data.length > 0) {
+      agentFilter.value = { name: ["in", data] };
+    } else {
+      agentFilter.value = { name: "___NO_AGENTS___" };
+    }
   },
 });
+
+// 2. HELPER TO SANITIZE THE API PAYLOAD
+function getCleanFilters() {
+  const apiFilters: Record<string, any> = {
+    from_date: filters.period?.split(",")[0] || null,
+    to_date: filters.period?.split(",")[1] || null,
+  };
+
+  if (isSuperUser.value || isManager.value) {
+    // If they have manager/admin access, allow team/agent keys
+    if (filters.team) apiFilters.team = filters.team;
+    if (filters.agent) apiFilters.agent = filters.agent;
+  } else {
+    // If they are a standard agent, FORCE their agent ID and NEVER send a team key
+    apiFilters.agent = userId.value;
+  }
+
+  return apiFilters;
+}
+
+// WATCHERS
+watch(
+  () => authStore.userTeams,
+  (teams) => {
+    if (teams && teams.length > 0 && !isSuperUser.value && !filters.team) {
+      filters.team = teams[0]; 
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => filters.team,
+  (newVal) => {
+    filters.agent = null; 
+    if (newVal) {
+      agentFilter.value = { name: "___LOADING_AGENTS___" };
+      teamMembers.update({ params: { team: newVal } });
+      teamMembers.reload();
+    } else {
+      agentFilter.value = isSuperUser.value ? null : { name: "___SELECT_A_TEAM___" };
+    }
+  },
+  { immediate: true }
+);
+  
 
 const { isManager, userId } = useAuthStore();
 
@@ -392,23 +468,23 @@ watch(activeTab, (val) => {
   validateView(val === "my_stats");
 });
 
-watch(
-  () => filters.team,
-  (newVal) => {
-    filters.agent = null; // Reset agent when team is selected
-    if (newVal) {
-      teamMembers.update({
-        params: {
-          team: newVal,
-        },
-      });
-      teamMembers.reload();
-    }
-    if (!newVal) {
-      agentFilter.value = null; // Reset agent filter if no team is selected
-    }
-  }
-);
+// watch(
+//   () => filters.team,
+//   (newVal) => {
+//     filters.agent = null; // Reset agent when team is selected
+//     if (newVal) {
+//       teamMembers.update({
+//         params: {
+//           team: newVal,
+//         },
+//       });
+//       teamMembers.reload();
+//     }
+//     if (!newVal) {
+//       agentFilter.value = null; // Reset agent filter if no team is selected
+//     }
+//   }
+// );
 
 //check empty for individual charts
 function isChartEmpty(chart: any) {
@@ -540,27 +616,64 @@ function formatRange(date: string) {
   });
 }
 
+// watch(
+//   () => filters,
+//   () => {
+//     if (showDatePicker.value && !filters.period) return;
+//     numberCards.reload();
+//     masterData.reload();
+//     trendData.reload();
+//   },
+//   { deep: true }
+// );
+
+// onMounted(() => {
+//   if (!isManager) {
+//     filters.agent = userId;
+//   } else {
+//     validateView(activeTab.value === "my_stats");
+//   }
+//   numberCards.reload();
+//   masterData.reload();
+//   trendData.reload();
+// });
 watch(
   () => filters,
   () => {
-    if (showDatePicker.value && !filters.period) return;
+    if (showDatePicker.value) return;
+    
+    // 3. FETCH DATA USING THE SANITIZED PAYLOAD
+    const cleanFilters = getCleanFilters();
+    
+    numberCards.update({ params: { dashboard_type: "number_card", filters: cleanFilters } });
     numberCards.reload();
+    
+    masterData.update({ params: { dashboard_type: "master", filters: cleanFilters } });
     masterData.reload();
+    
+    trendData.update({ params: { dashboard_type: "trend", filters: cleanFilters } });
     trendData.reload();
   },
   { deep: true }
 );
 
 onMounted(() => {
-  if (!isManager) {
-    filters.agent = userId;
-  } else {
-    validateView(activeTab.value === "my_stats");
+  if (!isManager.value && !isSuperUser.value) {
+    filters.agent = userId.value;
   }
+  
+  // 4. INITIALIZE FETCH ON MOUNT
+  const cleanFilters = getCleanFilters();
+  
+  numberCards.update({ params: { dashboard_type: "number_card", filters: cleanFilters } });
   numberCards.reload();
+  
+  masterData.update({ params: { dashboard_type: "master", filters: cleanFilters } });
   masterData.reload();
+  
+  trendData.update({ params: { dashboard_type: "trend", filters: cleanFilters } });
   trendData.reload();
-});
+});  
 
 usePageMeta(() => {
   return {
