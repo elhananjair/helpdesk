@@ -26,7 +26,8 @@ def get_user():
 
     roles = frappe.get_roles(current_user)
     is_admin = "System Manager" in roles or "Administrator" in roles
-
+    is_top_executive = ("Top Executives") in frappe.get_roles(current_user)
+    is_branch_operation = ("Branch Operation") in frappe.get_roles(current_user)
     is_agent = _is_agent()
     agent_name = get_agent_name()
     has_agent_record = bool(agent_name)
@@ -60,6 +61,8 @@ def get_user():
         "has_agent_record": has_agent_record,
         "user_id": user_id,
         "is_manager": is_manager,
+        "is_top_executive": is_top_executive,
+        "is_branch_operation": is_branch_operation,
         "user_image": user_image,
         "user_first_name": user_first_name,
         "user_name": user_name,
