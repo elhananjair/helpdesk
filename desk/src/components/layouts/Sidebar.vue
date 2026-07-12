@@ -358,12 +358,12 @@ const agentPortalDropdown = computed(() => [
   {
     icon: "lucide-life-buoy",
     label: __("Support"),
-    onClick: () => window.open("https://t.me/frappedesk"),
+    onClick: () => window.open("https://erp.liyumfi.net/helpdesk/tickets"),
   },
   {
     icon: "lucide-book-open",
     label: __("Docs"),
-    onClick: () => window.open("https://docs.frappe.io/helpdesk"),
+    onClick: () => window.open("https://cloud.liyumfi.net/ws-liyu-shared-document/User%20Manuals%20&%20Guideline/HRMS"),
   },
   {
     label: __("Login to Frappe Cloud"),
