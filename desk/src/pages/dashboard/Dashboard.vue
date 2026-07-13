@@ -450,7 +450,7 @@ watch(
 );
   
 
-const { isManager, userId } = useAuthStore();
+//const { isManager, userId } = useAuthStore();
 
 const viewMyStats = ref(false);
 const activeTab = useStorage("dashboard_active_tab", "organization");
