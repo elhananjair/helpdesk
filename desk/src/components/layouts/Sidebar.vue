@@ -115,7 +115,7 @@
           appName="helpdesk"
         />
       </div>
-
+    <!--
       <SidebarLink
         v-if="isOnboardingStepsCompleted && !isCustomerPortal"
         :icon="HelpIcon"
@@ -128,7 +128,7 @@
           }
         "
       />
-
+   -->
       <SidebarLink
         :icon="isExpanded ? LucideArrowLeftFromLine : LucideArrowRightFromLine"
         :is-active="false"
