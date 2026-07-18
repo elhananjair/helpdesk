@@ -50,6 +50,8 @@
             <LucideCalendar class="size-4 text-ink-gray-5 mr-2" />
           </template>
         </DateRangePicker>
+        
+        <!-- Team Selector: Linked to teamFilter to restrict non-superusers -->
         <Link
           v-if="isManager && !viewMyStats"
           class="form-control w-48"
@@ -57,12 +59,15 @@
           :placeholder="__('Team')"
           v-model="filters.team"
           :page-length="5"
+          :filters="teamFilter"
           :hide-me="true"
         >
           <template #prefix>
             <LucideUsers class="size-4 text-ink-gray-5 mr-2" />
           </template>
         </Link>
+        
+        <!-- Agent Selector: Linked to agentFilter to restrict based on selected team -->
         <Link
           v-if="isManager && !viewMyStats"
           class="form-control w-48"
@@ -87,10 +92,10 @@
       >
         <Tooltip
           v-for="(config, index) in numberCards.data"
+          :key="index"
           :text="config.tooltip"
         >
           <NumberChart
-            :key="index"
             class="border rounded-md min-h-[114px]"
             :config="config"
           />
@@ -206,6 +211,9 @@ const { isMobileView } = useScreenSize();
 import { computed, h, onMounted, reactive, ref, watch } from "vue";
 import LucideBuilding2 from "~icons/lucide/building-2";
 import LucideUser from "~icons/lucide/user";
+import LucideUsers from "~icons/lucide/users";
+import LucideCalendar from "~icons/lucide/calendar";
+import LucideChevronDown from "~icons/lucide/chevron-down";
 import { useScreenSize } from "@/composables/screen";
 import { useStorage } from "@vueuse/core";
 
@@ -251,7 +259,8 @@ interface ChartValues {
 }
 
 const dashboardTitle = computed(() => {
-  if (!isManager) return __("Agent Dashboard");
+  // Fixed missing .value execution from original code
+  if (!isManager.value) return __("Agent Dashboard");
   return viewMyStats.value ? __("My Dashboard") : __("Organization Dashboard");
 });
 
@@ -332,21 +341,30 @@ const isEmpty = computed(() => {
   );
 });
 
-const parseFilters = (filters: Filters) => {
-  return {
-    from_date: filters.period?.split(",")[0] ?? null,
-    to_date: filters.period?.split(",")[1] ?? null,
-    team: filters.team,
-    agent: filters.agent,
+// HELPER TO SANITIZE THE API PAYLOAD (Used directly in initial resource definitions to prevent 403)
+function getCleanFilters() {
+  const apiFilters: Record<string, any> = {
+    from_date: filters.period?.split(",")[0] || null,
+    to_date: filters.period?.split(",")[1] || null,
   };
-};
 
+  if (isSuperUser.value || isManager.value) {
+    if (filters.team) apiFilters.team = filters.team;
+    if (filters.agent) apiFilters.agent = filters.agent;
+  } else {
+    apiFilters.agent = userId.value;
+  }
+
+  return apiFilters;
+}
+
+// Resource definitions now execute getCleanFilters() immediately on instantiation
 const numberCards = createResource({
   url: "helpdesk.api.dashboard.get_dashboard_data",
   cache: ["Analytics", "NumberCards"],
   makeParams: () => ({
     dashboard_type: "number_card",
-    filters: parseFilters(filters),
+    filters: getCleanFilters(),
   }),
 });
 
@@ -355,7 +373,7 @@ const masterData = createResource({
   cache: ["Analytics", "MasterCharts"],
   makeParams: () => ({
     dashboard_type: "master",
-    filters: parseFilters(filters),
+    filters: getCleanFilters(),
   }),
 });
 
@@ -364,9 +382,10 @@ const trendData = createResource({
   cache: ["Analytics", "TrendCharts"],
   makeParams: () => ({
     dashboard_type: "trend",
-    filters: parseFilters(filters),
+    filters: getCleanFilters(),
   }),
 });
+
 // TEAM FILTER
 const teamFilter = computed(() => {
   if (isSuperUser.value) return null; 
@@ -381,17 +400,6 @@ const teamFilter = computed(() => {
 // AGENT FILTER
 const agentFilter = ref({ name: "___LOADING_AGENTS___" });
   
-//const agentFilter = ref(null);
-// const teamMembers = createResource({
-//   url: "helpdesk.helpdesk.doctype.hd_team.hd_team.get_team_members",
-//   cache: ["Analytics", "TeamMembers"],
-//   params: {
-//     team: filters.team,
-//   },
-//   onSuccess: (data) => {
-//     agentFilter.value = { name: ["in", data] };
-//   },
-// });
 const teamMembers = createResource({
   url: "helpdesk.helpdesk.doctype.hd_team.hd_team.get_team_members",
   cache: ["Analytics", "TeamMembers"],
@@ -403,25 +411,6 @@ const teamMembers = createResource({
     }
   },
 });
-
-// 2. HELPER TO SANITIZE THE API PAYLOAD
-function getCleanFilters() {
-  const apiFilters: Record<string, any> = {
-    from_date: filters.period?.split(",")[0] || null,
-    to_date: filters.period?.split(",")[1] || null,
-  };
-
-  if (isSuperUser.value || isManager.value) {
-    // If they have manager/admin access, allow team/agent keys
-    if (filters.team) apiFilters.team = filters.team;
-    if (filters.agent) apiFilters.agent = filters.agent;
-  } else {
-    // If they are a standard agent, FORCE their agent ID and NEVER send a team key
-    apiFilters.agent = userId.value;
-  }
-
-  return apiFilters;
-}
 
 // WATCHERS
 watch(
@@ -449,16 +438,13 @@ watch(
   { immediate: true }
 );
   
-
-//const { isManager, userId } = useAuthStore();
-
 const viewMyStats = ref(false);
 const activeTab = useStorage("dashboard_active_tab", "organization");
 function validateView(myStats: boolean) {
   viewMyStats.value = myStats;
   if (myStats) {
     filters.team = null;
-    filters.agent = userId;
+    filters.agent = userId.value;
   } else {
     filters.agent = null;
   }
@@ -468,25 +454,7 @@ watch(activeTab, (val) => {
   validateView(val === "my_stats");
 });
 
-// watch(
-//   () => filters.team,
-//   (newVal) => {
-//     filters.agent = null; // Reset agent when team is selected
-//     if (newVal) {
-//       teamMembers.update({
-//         params: {
-//           team: newVal,
-//         },
-//       });
-//       teamMembers.reload();
-//     }
-//     if (!newVal) {
-//       agentFilter.value = null; // Reset agent filter if no team is selected
-//     }
-//   }
-// );
-
-//check empty for individual charts
+// check empty for individual charts
 function isChartEmpty(chart: any) {
   if (!chart.data?.length) return true;
   return chart.data.every((row: any) =>
@@ -528,8 +496,6 @@ const showDatePicker = ref(false);
 const datePickerRef = ref(null);
 const preset = ref(__("Last 30 Days"));
 
-// frappe-ui v1 DateRangePicker models a [from, to] tuple; filters.period and
-// the API keep the legacy "from,to" string, so convert at the picker boundary.
 const periodRange = computed({
   get: (): string[] => (filters.period ? filters.period.split(",") : []),
   set: (range: string[]) => {
@@ -589,7 +555,7 @@ const options = computed(() => [
         datePickerRef.value?.open();
       }, 0);
       preset.value = __("Custom Range");
-      filters.period = null; // Reset period to allow custom date selection
+      filters.period = null;
     },
   },
 ]);
@@ -616,53 +582,20 @@ function formatRange(date: string) {
   });
 }
 
-// watch(
-//   () => filters,
-//   () => {
-//     if (showDatePicker.value && !filters.period) return;
-//     numberCards.reload();
-//     masterData.reload();
-//     trendData.reload();
-//   },
-//   { deep: true }
-// );
-
-// onMounted(() => {
-//   if (!isManager) {
-//     filters.agent = userId;
-//   } else {
-//     validateView(activeTab.value === "my_stats");
-//   }
-//   numberCards.reload();
-//   masterData.reload();
-//   trendData.reload();
-// });
 watch(
-  () => filters,
+  withCategoryFilters,
   () => {
     if (showDatePicker.value) return;
-    
-    // 3. FETCH DATA USING THE SANITIZED PAYLOAD
-    const cleanFilters = getCleanFilters();
-    
-    numberCards.update({ params: { dashboard_type: "number_card", filters: cleanFilters } });
-    numberCards.reload();
-    
-    masterData.update({ params: { dashboard_type: "master", filters: cleanFilters } });
-    masterData.reload();
-    
-    trendData.update({ params: { dashboard_type: "trend", filters: cleanFilters } });
-    trendData.reload();
+    triggerFetch();
   },
   { deep: true }
 );
 
-onMounted(() => {
-  if (!isManager.value && !isSuperUser.value) {
-    filters.agent = userId.value;
-  }
-  
-  // 4. INITIALIZE FETCH ON MOUNT
+function withCategoryFilters() {
+  return filters;
+}
+
+function triggerFetch() {
   const cleanFilters = getCleanFilters();
   
   numberCards.update({ params: { dashboard_type: "number_card", filters: cleanFilters } });
@@ -673,6 +606,13 @@ onMounted(() => {
   
   trendData.update({ params: { dashboard_type: "trend", filters: cleanFilters } });
   trendData.reload();
+}
+
+onMounted(() => {
+  if (!isManager.value && !isSuperUser.value) {
+    filters.agent = userId.value;
+  }
+  triggerFetch();
 });  
 
 usePageMeta(() => {
